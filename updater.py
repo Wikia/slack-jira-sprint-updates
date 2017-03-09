@@ -113,7 +113,7 @@ class Application(object):
         if response.status_code != 200:
             logging.warning("Failed to fetch data from github for {}".format(self.repo_name))
 
-        tags = json.loads(response.text)
+        tags = response.json()
         tag_names = [t['name'] for t in tags if t['name'].startswith('release-')]
 
         return tag_names[0].split('.')[0]
