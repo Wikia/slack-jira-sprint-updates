@@ -1,29 +1,17 @@
 # coding=utf-8
 import datetime
-import getopt
 import json
 import logging
-import sys
 import os
 
 import requests
 
 JIRA_AUTHORIZATION = os.environ['JIRA_AUTHORIZATION']
-SLACK_CHANNEL = os.environ['SLACK_CHANNEL']  # like #x-wing
+SLACK_CHANNEL = os.environ['SLACK_CHANNEL']
 SLACK_BOT_TOKEN = os.environ['SLACK_BOT_TOKEN']
 SLACK_BOT_NAME = os.environ['SLACK_BOT_NAME']
 JIRA_PROJECT_NAME = os.environ['JIRA_PROJECT_NAME']
 GITHUB_TOKEN = os.environ['GITHUB_TOKEN']
-
-days_count = {
-    0: '6',
-    1: '2',
-    2: '3',
-    3: '2',
-    4: '3',
-    5: '4',
-    6: '5'
-}
 
 
 class JiraController():
@@ -66,21 +54,14 @@ class JiraController():
         return response
 
     def get_params(self, release_version):
+        days_count = {
+            0: '6', 1: '2', 2: '3', 3: '2', 4: '3', 5: '4', 6: '5'}
         today = datetime.datetime.today().weekday()
         params = {
             'project_name': JIRA_PROJECT_NAME,
             'days_before': days_count[today],
             'release_version': release_version
         }
-
-        optlist, args = getopt.getopt(sys.argv[1:], "p:d:", ["project=", "days="])
-        print optlist
-
-        for option, arg in optlist:
-            if option in ("-p", "--project") and arg != '--days':
-                params['project_name'] = arg
-            if option in ("-d", "--days") and arg.isdigit():
-                params['days_before'] = arg
 
         return params
 
@@ -154,5 +135,3 @@ if __name__ == "__main__":
     slack = SlackUpdater()
     update = slack.prepare_slack_update(tickets)
     slack.post_slack_message(update)
-
-
