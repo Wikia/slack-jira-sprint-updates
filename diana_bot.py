@@ -1,17 +1,19 @@
 # coding=utf-8
-import logging
 import datetime
-import requests
-import sys
 import getopt
+import logging
 import re
+import sys
 import urllib
-from credentials import SLACK_BOT_TOKEN,\
-    JIRA_AUTHORIZATION,\
-    JIRA_API_URL,\
-    SLACK_CHANNEL_ID,\
-    SLACK_BOT_NAME,\
-    SPECIAL_VERSION_URL,\
+
+import requests
+
+from credentials import SLACK_BOT_TOKEN, \
+    JIRA_AUTHORIZATION, \
+    JIRA_API_URL, \
+    SLACK_CHANNEL_ID, \
+    SLACK_BOT_NAME, \
+    SPECIAL_VERSION_URL, \
     JIRA_PROJECT_NAME
 
 days_count = {
@@ -24,9 +26,10 @@ days_count = {
     6: '5'
 }
 
+
 class JiraController():
     def __init__(self):
-        logging.basicConfig(level = logging.INFO)
+        logging.basicConfig(level=logging.INFO)
 
     def get_tickets(self, release_version):
         """
@@ -39,8 +42,8 @@ class JiraController():
 
         for ticket in finished_tickets['issues']:
             response.append({
-                "key" : ticket['key'],
-                "desc" : ticket['fields']['summary']
+                "key": ticket['key'],
+                "desc": ticket['fields']['summary']
             })
 
         return response
@@ -52,12 +55,14 @@ class JiraController():
         }
 
         response = requests.get(JIRA_API_URL,
-            params = {
-                'jql': 'project="' + params['project_name'] + '" AND "Preview branch" ~ "' + params['release_version'] + '"'
-            },
-            headers = headers).json()
+                                params={
+                                    'jql': 'project="' + params['project_name'] + '" AND "Preview branch" ~ "' + params[
+                                        'release_version'] + '"'
+                                },
+                                headers=headers).json()
 
-        logging.info("\nFetching data from last " + params['days_before'] + " days for project " + params['project_name'])
+        logging.info(
+            "\nFetching data from last " + params['days_before'] + " days for project " + params['project_name'])
 
         return response
 
@@ -84,7 +89,7 @@ class JiraController():
 class SlackUpdater(object):
     SLACK_API_URL = 'https://slack.com/api/chat.postMessage'
 
-    def __init__(self, slack_bot_token = None, slack_bot_channel = SLACK_CHANNEL_ID):
+    def __init__(self, slack_bot_token=None, slack_bot_channel=SLACK_CHANNEL_ID):
         assert slack_bot_token is not None
         assert slack_bot_channel is not None
 
@@ -93,20 +98,20 @@ class SlackUpdater(object):
 
     def post_slack_message(self, payload):
         response = requests.post(self.SLACK_API_URL,
-                      data = {
-                          'channel': self.slack_bot_channel,
-                          'token': self.slack_bot_token,
-                          'text': payload,
-                          'username': SLACK_BOT_NAME
-                      })
+                                 data={
+                                     'channel': self.slack_bot_channel,
+                                     'token': self.slack_bot_token,
+                                     'text': payload,
+                                     'username': SLACK_BOT_NAME
+                                 })
 
         logging.info("\nPosting to Slack: done")
 
-    def prepare_slack_update(self, tickets, team = '*Content West- Wing*'):
+    def prepare_slack_update(self, tickets, team='*X-Wing*'):
         """
         Processes acquired results
         """
-        if (len(tickets) == 0):
+        if len(tickets) == 0:
             return team + ' :Nothing user facing'
 
         result = '```'
@@ -116,6 +121,7 @@ class SlackUpdater(object):
 
         return result + '```'
 
+
 class Wikia(object):
     def get_current_version(self):
         handler = urllib.urlopen(SPECIAL_VERSION_URL)
@@ -124,9 +130,10 @@ class Wikia(object):
         assert matches is not None
         return matches.group(1)
 
+
 if __name__ == "__main__":
     calculation = JiraController()
-    slack_updater = SlackUpdater( slack_bot_token = SLACK_BOT_TOKEN )
+    slack_updater = SlackUpdater(slack_bot_token=SLACK_BOT_TOKEN)
     wikia = Wikia()
 
     tickets = calculation.get_tickets(wikia.get_current_version())
