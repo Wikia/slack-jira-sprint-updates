@@ -4,16 +4,16 @@ import getopt
 import json
 import logging
 import sys
+import os
 
 import requests
 
-from credentials import JIRA_AUTHORIZATION, \
-    JIRA_API_URL, \
-    SLACK_CHANNEL_ID, \
-    SLACK_BOT_TOKEN, \
-    SLACK_BOT_NAME, \
-    JIRA_PROJECT_NAME, \
-    GITHUB_TOKEN
+JIRA_AUTHORIZATION = os.environ['JIRA_AUTHORIZATION']
+SLACK_CHANNEL = os.environ['SLACK_CHANNEL']  # like #x-wing
+SLACK_BOT_TOKEN = os.environ['SLACK_BOT_TOKEN']
+SLACK_BOT_NAME = os.environ['SLACK_BOT_NAME']
+JIRA_PROJECT_NAME = os.environ['JIRA_PROJECT_NAME']
+GITHUB_TOKEN = os.environ['GITHUB_TOKEN']
 
 days_count = {
     0: '6',
@@ -53,7 +53,7 @@ class JiraController():
             'Authorization': JIRA_AUTHORIZATION
         }
 
-        response = requests.get(JIRA_API_URL,
+        response = requests.get('https://wikia-inc.atlassian.net/rest/api/2/search',
                                 params={
                                     'jql': 'project="' + params['project_name'] + '" AND "Preview branch" ~ "' + params[
                                         'release_version'] + '"'
@@ -86,20 +86,11 @@ class JiraController():
 
 
 class SlackUpdater(object):
-    SLACK_API_URL = 'https://slack.com/api/chat.postMessage'
-
-    def __init__(self, slack_bot_token=None, slack_bot_channel=SLACK_CHANNEL_ID):
-        assert slack_bot_token is not None
-        assert slack_bot_channel is not None
-
-        self.slack_bot_token = slack_bot_token
-        self.slack_bot_channel = slack_bot_channel
-
     def post_slack_message(self, payload):
-        requests.post(self.SLACK_API_URL,
+        requests.post('https://slack.com/api/chat.postMessage',
                       data={
-                          'channel': self.slack_bot_channel,
-                          'token': self.slack_bot_token,
+                          'channel': SLACK_CHANNEL,
+                          'token': SLACK_BOT_TOKEN,
                           'text': payload,
                           'username': SLACK_BOT_NAME
                       })
@@ -113,7 +104,7 @@ class SlackUpdater(object):
         result = ''
         print tickets
         for release, tickets_list in tickets.iteritems():
-            result += '*' + release + ':*\n'
+            result += '*' + release + '*\n'
 
             if len(tickets_list) == 0:
                 result += 'Nothing user facing\n'
@@ -151,20 +142,16 @@ class Application(object):
 
 
 if __name__ == "__main__":
-    apps = [
-        Application('wikia', 'app'),
-        Application('mercury'),
-        Application('mobile-wiki'),
-    ]
+    app_config = json.loads(os.environ['APPS'])
+    apps = [Application(**ac) for ac in app_config]
 
-    # releases = [a.get_full_release_name() for a in apps]
-    releases = ['wikia:release-490', 'mercury:release-322', 'mobile-wiki:release-5']
+    releases = [a.get_full_release_name() for a in apps]
     logging.info(releases)
 
     jira = JiraController()
     tickets = {release: jira.get_tickets(release_version=release) for release in releases}
 
-    slack = SlackUpdater(slack_bot_token=SLACK_BOT_TOKEN)
+    slack = SlackUpdater()
     update = slack.prepare_slack_update(tickets)
     slack.post_slack_message(update)
 
