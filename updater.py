@@ -1,5 +1,4 @@
 # coding=utf-8
-import datetime
 import json
 import logging
 import os
@@ -43,23 +42,22 @@ class JiraController():
 
         response = requests.get('https://wikia-inc.atlassian.net/rest/api/2/search',
                                 params={
-                                    'jql': 'project="' + params['project_name'] + '" AND "Preview branch" ~ "' + params[
-                                        'release_version'] + '"'
+                                    'jql': 'project="{project}" AND "Preview branch" ~ "{release}"'.format(
+                                        project=params['project_name'], release=params['release_version'])
                                 },
-                                headers=headers).json()
+                                headers=headers
+                                ).json()
 
         logging.info(
-            "\nFetching data from last " + params['days_before'] + " days for project " + params['project_name'])
+            "\nFetching data for {project} for {release}".format(project=params['project_name'],
+                                                                 release=params['release_version'])
+        )
 
         return response
 
     def get_params(self, release_version):
-        days_count = {
-            0: '6', 1: '2', 2: '3', 3: '2', 4: '3', 5: '4', 6: '5'}
-        today = datetime.datetime.today().weekday()
         params = {
             'project_name': JIRA_PROJECT_NAME,
-            'days_before': days_count[today],
             'release_version': release_version
         }
 
@@ -83,7 +81,6 @@ class SlackUpdater(object):
         Processes acquired results
         """
         result = ''
-        print tickets
         for release, tickets_list in tickets.iteritems():
             result += '*' + release + '*\n'
 

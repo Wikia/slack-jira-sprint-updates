@@ -29,5 +29,5 @@ For example using cron, to run script every week from Monday to Thursday at 4p.m
 * run `crontab -e` on machine you want to run the script on.
 * paste following line:
 
-`0 16 * * 1-4 python ~/slack-jira-sprint-updates/diana_bot.py`
+`0 16 * * 1-4 python ~/slack-jira-sprint-updates/updater.py`
 
