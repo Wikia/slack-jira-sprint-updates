@@ -1,20 +1,19 @@
 # coding=utf-8
 import datetime
 import getopt
+import json
 import logging
-import re
 import sys
-import urllib
 
 import requests
 
-from credentials import SLACK_BOT_TOKEN, \
-    JIRA_AUTHORIZATION, \
+from credentials import JIRA_AUTHORIZATION, \
     JIRA_API_URL, \
     SLACK_CHANNEL_ID, \
+    SLACK_BOT_TOKEN, \
     SLACK_BOT_NAME, \
-    SPECIAL_VERSION_URL, \
-    JIRA_PROJECT_NAME
+    JIRA_PROJECT_NAME, \
+    GITHUB_TOKEN
 
 days_count = {
     0: '6',
@@ -71,7 +70,7 @@ class JiraController():
         params = {
             'project_name': JIRA_PROJECT_NAME,
             'days_before': days_count[today],
-            'release_version': 'wikia:%s' % release_version
+            'release_version': release_version
         }
 
         optlist, args = getopt.getopt(sys.argv[1:], "p:d:", ["project=", "days="])
@@ -97,45 +96,76 @@ class SlackUpdater(object):
         self.slack_bot_channel = slack_bot_channel
 
     def post_slack_message(self, payload):
-        response = requests.post(self.SLACK_API_URL,
-                                 data={
-                                     'channel': self.slack_bot_channel,
-                                     'token': self.slack_bot_token,
-                                     'text': payload,
-                                     'username': SLACK_BOT_NAME
-                                 })
+        requests.post(self.SLACK_API_URL,
+                      data={
+                          'channel': self.slack_bot_channel,
+                          'token': self.slack_bot_token,
+                          'text': payload,
+                          'username': SLACK_BOT_NAME
+                      })
 
         logging.info("\nPosting to Slack: done")
 
-    def prepare_slack_update(self, tickets, team='*X-Wing*'):
+    def prepare_slack_update(self, tickets):
         """
         Processes acquired results
         """
-        if len(tickets) == 0:
-            return team + ' :Nothing user facing'
+        result = ''
+        print tickets
+        for release, tickets_list in tickets.iteritems():
+            result += '*' + release + ':*\n'
 
-        result = '```'
+            if len(tickets_list) == 0:
+                result += 'Nothing user facing\n'
+            else:
+                result += '```'
+                for ticket in tickets_list:
+                    result += 'https://wikia-inc.atlassian.net/browse/' + ticket['key'] + ' ' + ticket['desc'] + '\n'
+                result += '```\n'
+            result += '\n'
+        return result
 
-        for ticket in tickets:
-            result += 'https://wikia-inc.atlassian.net/browse/' + ticket['key'] + ' ' + ticket['desc'] + '\n'
 
-        return result + '```'
+class Application(object):
+    def __init__(self, app_name, repo_name=None):
+        self.app_name = app_name
+        self.repo_name = repo_name if repo_name else app_name
+        self.github_api_url = "https://api.github.com/repos/Wikia/{name}/tags".format(name=self.repo_name)
+        self.headers = {
+            'Authorization': 'token {}'.format(GITHUB_TOKEN)
+        }
 
+    def get_latest_release(self):
+        response = requests.get(self.github_api_url, headers=self.headers)
 
-class Wikia(object):
-    def get_current_version(self):
-        handler = urllib.urlopen(SPECIAL_VERSION_URL)
-        html = handler.read()
-        matches = re.search(r"(release-\d+)\.\d+", html, re.MULTILINE)
-        assert matches is not None
-        return matches.group(1)
+        if response.status_code != 200:
+            logging.warning("Failed to fetch data from github for {}".format(self.repo_name))
+
+        tags = json.loads(response.text)
+        tag_names = [t['name'] for t in tags if t['name'].startswith('release-')]
+
+        return tag_names[0].split('.')[0]
+
+    def get_full_release_name(self):
+        return "{app}:{release}".format(app=self.app_name, release=self.get_latest_release())
 
 
 if __name__ == "__main__":
-    calculation = JiraController()
-    slack_updater = SlackUpdater(slack_bot_token=SLACK_BOT_TOKEN)
-    wikia = Wikia()
+    apps = [
+        Application('wikia', 'app'),
+        Application('mercury'),
+        Application('mobile-wiki'),
+    ]
 
-    tickets = calculation.get_tickets(wikia.get_current_version())
-    release_update = slack_updater.prepare_slack_update(tickets)
-    slack_updater.post_slack_message(release_update)
+    # releases = [a.get_full_release_name() for a in apps]
+    releases = ['wikia:release-490', 'mercury:release-322', 'mobile-wiki:release-5']
+    logging.info(releases)
+
+    jira = JiraController()
+    tickets = {release: jira.get_tickets(release_version=release) for release in releases}
+
+    slack = SlackUpdater(slack_bot_token=SLACK_BOT_TOKEN)
+    update = slack.prepare_slack_update(tickets)
+    slack.post_slack_message(update)
+
+
