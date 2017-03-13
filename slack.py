@@ -27,14 +27,12 @@ class SlackUpdater(object):
         """
         result = ''
         for release, tickets_list in tickets.iteritems():
-            result += '*' + release + '*\n'
-
-            if len(tickets_list) == 0:
-                result += 'Nothing user facing\n'
-            else:
-                result += '```'
+            if len(tickets_list) != 0:
+                result += '*' + release + '*\n```'
                 for ticket in tickets_list:
                     result += 'https://wikia-inc.atlassian.net/browse/' + ticket['key'] + ' ' + ticket['desc'] + '\n'
                 result += '```\n'
-            result += '\n'
+
+        if len(result) == 0:
+            result = 'Nothing user facing'
         return result
